@@ -314,7 +314,7 @@
         $ npm install --save-dev file-loader
         ```
     1. Check results:
-        - After running, you can find a JPG file been built in console log. You can also check the `build` file, there is a big image in there.
+        - After running, you can find a JPG file been built in console log. You can also check the `build` file, there is a big image in there.<br />
             <img src="./screenshots/separate-big-image.png" alt="separate-big-image" width=600px />
         - You can check the `bundle.js` to see the small image in raw data (long string) .
             ```js
@@ -386,6 +386,176 @@
             document.body.appendChild(image);
         }
         ```
-    1. Run npm build. Open `Inspect` of browser and check `Network` tag and see `JS` file only.<br />
-        <img src="./screenshots/before-click.png" alt="before-click" width=600px /><br />
+    1. Run npm build. Open `Inspect` of browser and check `Network` tag and see `JS` file only.
+        - Before click:<br />
+        <img src="./screenshots/before-click.png" alt="before-click" width=600px />
+        - After click:<br />
         <img src="./screenshots/after-click.png" alt="after-click" width=600px/>
+## Webpack Project
+- You need to download the project first, you can clone project by using following code. After downloading, install project dependencies by `npm install`.
+    ```
+    $ git clone https://github.com/StephenGrider/WebpackProject.git
+    ```
+- Setting up Babel
+    - Exclude: Don't apply babel on any files located inside of `node_modules`.
+        ```js
+        module: {
+            rules: [
+                {
+                    use: 'babel-loader',
+                    test: /\.js$/,
+                    exclude: /node_modules/
+                },
+                {
+                    use: ['style-loader', 'css-loader'],
+                    test: /\.css$/
+                }
+            ]
+        }
+        ```
+    - Presets: create a file `.babelrc` as follows. `react` means that do not handle the transpilation of JSX over to raw JS.
+        ```babelrc
+        {
+            "presets": ["babel-preset-env", "react"]
+        }
+        ```
+    - Run npm build, you'll find some warning show up. Because `bundle.js` is more than recommended size 250 kB. Now you can open html to see this application.
+        ```
+        $ open index.html
+        ```
+- Vendor code
+    - Caching: If the user (browser) have downloaded the JS file before, then user don't need to download it again in the future.
+    - `vendor.js` consists of all third-party dependencies, this part isn't updated too frequently compare to codebase. So we can separate `vendor.js` from `bundle.js` to do some caching.
+    - We separate output to 2 files, use `[name].js` to fit key in the `entry` to build the file `bundle.js` and `vendor.js`.
+        ```js
+        entry: {
+            bundle: './src/index.js',
+            vendor: VENDOR_LIBS
+        },
+        output: {
+            path: path.join(__dirname, 'dist'),
+            filename: '[name].js'
+        }
+        ```
+    - Define `VENDOR_LIBS` to list the dependencies you want to put in `vendor.js`.
+        ```js
+        const VENDOR_LIBS = [
+            "faker", "lodash", "react", "react-dom",
+            "react-input-range", "react-redux",
+            "react-router", "redux",
+            "redux-form", "redux-thunk"
+        ]
+        ```
+    - Run npm build, you'll find `vendor.js` is built successfully, but the size `bundle.js` is not change. Because we just pull (copy) the dependencies out of bundle.js to build vendor.js, it doesn't mean webpack will automatically find the common modules between the 2 files.
+        <img src="screenshots/bundle-not-change.png" width=450px />
+    - Add plugin as follows to tell webpack if there are copies or duplicates in any modules, pull them out and only add them to the `vendor` entry point.
+        ```js
+        plugins: [
+            new webpack.optimize.CommonsChunkPlugin({
+                name: 'vendor'
+            })
+        ]
+        ```
+    - Now we run npm build, we'll don't have duplicate code in `bundle.js` (separate successfully).
+        <img src="screenshots/separate-vendor.png" width=450px />
+    - But when you open the application again, you can't see anything. Open console you'll following error messages, why?
+        ```
+        Uncaught ReferenceError: webpackJsonp is not defined
+        ```
+    - Because in the `index.html`, we forgot to add `vendor.js` in the `<script>` tag.
+    - Install `html-webpack-plugin`. We can use this plugin to add scripts for us automatically.
+        ```
+        $ npm install --save-dev html-webpack-plugin
+        ```
+    - We need to move `index.html` under `src` folder, because we want to configure this file now, so it makes sense. Configure in `webpack.config.js` like so, this configuration will automatically find add all the scripts (`bundle.js` and `vendor.js`) that was generated, and add script tags to the `dist/index.html` document.
+        ```js
+        var HtmlWebpackPlugin = require('html-webpack-plugin');
+
+        module.exports = {
+            ...
+            plugins: [
+                new HtmlWebpackPlugin({
+                    template: 'src/index.html'
+                })
+            ]
+        }
+        ```
+    - Run npm build, application will start successfully.
+- Caching problem: The browser will cache the JS file, when we update our code with same name `bundle.js`, the user's browser don't know that's different from previous version. So browser doesn't download the new version.
+    - Chunk hash: Use unique hash to identify different version of `bundle.js`.
+        ```js
+        output: {
+            path: path.join(__dirname, 'dist'),
+            filename: '[name].[chunkhash].js'
+        },
+        ```
+    - We need to change `CommonsChunkPlugin` setting, if you don't change it, then it will think that vendor is updated too. Now we add a third file called `manifest`. The purpose of `manifest.js` is to tell the browser whether or not the vendor file actually got changed.
+        ```js
+        plugins: [
+            new webpack.optimize.CommonsChunkPlugin({
+                names: ['vendor', 'manifest']
+            })
+        ]
+        ```
+    - Rebuild the project and you'll see chunk hash after file name.<br />
+        <img src="screenshots/chunk-hash.png" width=450px />
+    - Try to add some code in the file and rebuild it, you'll find the bundle file name will be changed but vendor file is same.<br />
+        <img src="screenshots/rebuild.png" width=450px />
+- Cleaning files
+    - You can open the `dist` and you find every time you run build, you'll get a new file. But old files are not removed owing to different name cannot be overridden.<br />
+        <img src="screenshots/dist.png" width=300px />
+    - Install `rimraf`.
+        ```
+        npm install --save-dev rimraf
+        ```
+    - Go to `package.json` to set it up.
+        ```json
+        {
+            "scripts": {
+                "clean": "rimraf dist",
+                "build": "npm run clean && webpack"
+            }
+        }
+        ```
+    - Run build and check `dist`.
+## Webpack Dev Server
+- Webpack dev server is responsible for watching all of project code (files), and automatically rebuilding the project whenever one of the files change. Notice this tool is just for development not for production.
+- When we open up the web browser, we will make connection to webpack dev server which will automatically feed us all resources instead of loading up the `index.html`. So we will no longer be manually opening up `index.html`.
+- Webpack dev server in action
+    1. Install webpack-dev-server.
+        ```
+        $ npm install --save-dev webpack-dev-server@2.2.0-rc.0
+        ```
+    1. Add a script in `package.json`.
+        ```
+        {
+            "scripts": {
+                "serve": "webpack-dev-server"
+            }
+        }
+        ```
+    1. Use `npm run serve` to fire up the service and visit [http://localhost:8080](http://localhost:8080) to check service.
+    1. Try to change a file, you'll find when you save this file, webpack dev server will automatically rebuild that file, just one file instead of whole files.<br />
+        <img src="screenshots/rebuild-a-file.png" width=600px />
+    1. Use following commands to clean `dist` and fire up the server again.
+        ```
+        $ npm run clean
+        $ npm run serve
+        ```
+    1. Open up [http://localhost:8080](http://localhost:8080), you'll see the service is still running although there's no `dict`. That's because server will load files in memory instead of physical files.
+## React-specific optimization
+- Go to `router.js` to see all pages in the service. We want to separate each file from `bundle.js`.
+- We take the existing JSX routes and transform them into some plain route components, see this refactored [router.js](webpack-project/src/router.js). The following code shows that react router will automatically call `getComponent()`, inside of it, we can fetch the code (`import()`) for child component and once it's fetched we'll callback (`cb`) with the component. This callback function means when we get the module (`ArtistCreate`), we can callback with this component and get `module.default`.
+    ```js
+    {
+        path: 'artists/new',
+        getComponent(location, cb) {
+            System.import('./components/artists/ArtistCreate')
+            .then(module => cb(null, module.default))
+        }
+    }
+    ```
+- Visit [http://localhost:8080](http://localhost:8080), when you change the page (child component), you'll find browser will load a extra JS file.
+- If you've got an application that's only like a handful of different pages, you don't need code splitting like the above way. It's just for the application which has tons of different routes. Notice you cannot use smarter way to go through each `childRoute` by for loop or else, because webpack doesn't have ability to handle string concatenation or interpellation.
+## Deployment
+
