@@ -388,9 +388,9 @@
         ```
     1. Run npm build. Open `Inspect` of browser and check `Network` tag and see `JS` file only.
         - Before click:<br />
-        <img src="./screenshots/before-click.png" alt="before-click" width=600px />
+            <img src="./screenshots/before-click.png" alt="before-click" width=600px />
         - After click:<br />
-        <img src="./screenshots/after-click.png" alt="after-click" width=600px/>
+            <img src="./screenshots/after-click.png" alt="after-click" width=600px/>
 ## Webpack Project
 - You need to download the project first, you can clone project by using following code. After downloading, install project dependencies by `npm install`.
     ```
@@ -446,7 +446,7 @@
             "redux-form", "redux-thunk"
         ]
         ```
-    - Run npm build, you'll find `vendor.js` is built successfully, but the size `bundle.js` is not change. Because we just pull (copy) the dependencies out of bundle.js to build vendor.js, it doesn't mean webpack will automatically find the common modules between the 2 files.
+    - Run npm build, you'll find `vendor.js` is built successfully, but the size `bundle.js` is not change. Because we just pull (copy) the dependencies out of bundle.js to build vendor.js, it doesn't mean webpack will automatically find the common modules between the 2 files.<br />
         <img src="screenshots/bundle-not-change.png" width=450px />
     - Add plugin as follows to tell webpack if there are copies or duplicates in any modules, pull them out and only add them to the `vendor` entry point.
         ```js
@@ -456,7 +456,7 @@
             })
         ]
         ```
-    - Now we run npm build, we'll don't have duplicate code in `bundle.js` (separate successfully).
+    - Now we run npm build, we'll don't have duplicate code in `bundle.js` (separate successfully).<br />
         <img src="screenshots/separate-vendor.png" width=450px />
     - But when you open the application again, you can't see anything. Open console you'll following error messages, why?
         ```
@@ -558,4 +558,55 @@
 - Visit [http://localhost:8080](http://localhost:8080), when you change the page (child component), you'll find browser will load a extra JS file.
 - If you've got an application that's only like a handful of different pages, you don't need code splitting like the above way. It's just for the application which has tons of different routes. Notice you cannot use smarter way to go through each `childRoute` by for loop or else, because webpack doesn't have ability to handle string concatenation or interpellation.
 ## Deployment
+- Webpack pumps out static assets only by default, so it's not served by a dynamic server. So if all we need is more than static assets, we should use a custom server like Node, Django to serve the browser.
 
+    Static Asset Providers|Server-based Providers
+    --|--
+    Github Pages|Amazon EC2
+    Amazon S3|Amazon ELB
+    Digital Ocean|Digital Ocean
+    MS Azure|Heroku
+    Surge|MS Azure
+
+- Setting up environment variables for production
+    - Run react in production.
+        ```json
+        // package.json
+        {
+            "scripts": {
+                "build": "NODE_ENV=production npm run clean && webpack",
+            }
+        }
+        ```
+        ```js
+        // webpack.config.js
+        plugins: [
+            new webpack.DefinePlugin({
+                'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
+            })
+        ]
+        ```
+    -  Tell webpack we want a production version of the output by `webpack -p`. It will minify the JS code, which means it will automatically rename some of the variables and compact down all of the code into the minimum amount of code possible. The production output is 20%-30% smaller than development mode.
+        ```json
+        {
+            "scripts": {
+                "build": "... && webpack -p",
+            }
+        }
+        ```
+- Surge deployment
+    1. Install Surge globally.
+        ```
+        $ npm install -g surge
+        ```
+    1. Update project (build again).
+        ```
+        $ npm run build
+        ```
+    - Tell Surge directory `dist` that you want to deploy. After inputting command, you need to input your email and password and press enter.
+        ```
+        $ surge -p dist
+        ```
+    - You'll see the link as follows (https://upset-scene.surge.sh), open it up on your browser, you'll see the service.
+        <img src="screenshots/surge.png" width=600px />
+    - If you want to change the domain, please refer to this [instruction](https://surge.sh/help/adding-a-custom-domain).
